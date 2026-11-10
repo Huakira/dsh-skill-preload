@@ -68,13 +68,14 @@ export function apply(ctx, config) {
 
     const text = [
       '<system-reminder>',
-      'The following skills were preloaded for this session by configuration. Treat them as already loaded via the skill tool; follow their instructions and do not load them again.',
+      'Preloaded skills (full text below). Follow them. If they tell you to load other skills, do that first.',
       '',
       blocks.join('\n\n'),
       '</system-reminder>',
     ].join('\n')
 
     agent.inject({
+      role: 'user',
       content: [{ type: 'text', text }],
       source: { kind: 'skill-preload' },
     })
