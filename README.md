@@ -1,12 +1,15 @@
 # dsh-skill-preload
 
-DeepSeek Harness (DSH) 插件：每个新会话开始时，自动把你指定的技能全文注入上下文，模型从第一步就带着这些技能，不必自己去调 `skill` 工具。
+DeepSeek Harness (DSH) 插件：在会话开始、恢复、清空或压缩后，运行所选技能自带的 `scripts/inject.py`，把标准输出直接注入上下文。默认选择 `preload`，模型不需要再调用 `startup-bundle` 工具。
 
-A DeepSeek Harness plugin that injects the full text of chosen skills into every new session, so the model starts with them already loaded.
+A DSH plugin that runs the selected skill's `scripts/inject.py` on session lifecycle events and directly injects its stdout. It defaults to `preload`.
 
-## 为什么需要它 / Why
+## 职责边界 / Responsibilities
 
-DSH 不会展开 `AGENTS.md` 里的 `@path` 导入，也没有“自动加载技能”的配置项。把开场技能写在 `AGENTS.md` 里，只是参考内容，模型可以忽略。本插件在 `agent/created` 时用 `agent.inject()` 把技能正文放进第一步，稳定可靠。
+- 插件只选择技能、找到该技能的注入脚本并执行。
+- MCPHub 地址、专用只读令牌、缓存位置、联网失败后的回退，全部由 preload 技能自己的脚本管理。
+- 插件配置里没有地址、令牌、缓存目录或触发时机。
+- 子代理会话不注入，避免每个子任务都重复携带完整开场包。
 
 ## 安装 / Install
 
@@ -15,15 +18,22 @@ dsh plugin add /path/to/dsh-skill-preload      # 本地目录
 # 或在 Plugins 页 → Add plugin → 填本目录或 Git 地址
 ```
 
+需要系统可用的 `python3`；注入脚本只使用 Python 标准库。
+
 ## 配置 / Configuration
 
-安装后在 **Plugins 页 → 技能预加载 → Configure** 里设置，改动立即保存，对之后新建的会话生效：
+安装后在 **Plugins 页 → 技能预加载 → Configure** 中选择一个技能，默认 `preload`。改动立即保存，对之后发生的会话生命周期事件生效。
 
-| 字段 | 默认 | 说明 |
-|---|---|---|
-| `skills` | `[preload]` | 要预加载的技能名，按顺序注入 |
-| `on` | `[startup, clear]` | 触发时机：`startup` / `resume` / `clear` / `compact` |
-| `subagents` | `false` | 子代理会话是否也预加载 |
+所选技能必须有：
+
+```text
+<skill-directory>/
+├── SKILL.md
+└── scripts/
+    └── inject.py
+```
+
+`inject.py` 应把要注入的文本写到标准输出。preload 的实现成功时原样输出 MCPHub 开场包并覆盖缓存，失败时输出上次缓存；没有缓存才输出 MCP 工具回退提示。
 
 也可以直接在 profile 的 `cordis.patch.yml` 里写：
 
@@ -32,17 +42,10 @@ dsh plugin add /path/to/dsh-skill-preload      # 本地目录
     - id: skill-preload
       name: '@local/dsh-skill-preload'
       config:
-        skills: [preload]
-        on: [startup, clear]
-        subagents: false
+        skill: preload
 ```
 
-“可选技能”列表来自加载时扫描 `~/.agents/skills`、`~/.dsh/skills`、`~/.claude/skills`；新装技能后需重新加载插件才会出现，也可以手动输入技能名。
-
-## 说明 / Notes
-
-- 模块从 `$DSH_PROFILE_DIR` 解析 `@deepseek-ai/schemastery`（每个 DSH profile 都带），因此以本地目录链接安装也能工作。
-- 默认不在 `resume`、`compact` 时注入：历史里已有之前的注入内容，重复注入只会多占上下文。
+“可选技能”列表来自加载时扫描 `~/.agents/skills`、`~/.dsh/skills`、`~/.claude/skills`；新装技能后需重新加载插件才会出现在列表中。
 
 ## License
 

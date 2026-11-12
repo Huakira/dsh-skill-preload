@@ -1,21 +1,15 @@
 /**
- * Preload skills: inject the full body of configured skills into every new
- * session, so the model starts with them without having to call the skill tool.
- *
- * The fields are volatile: they are edited from the Plugins page (client.js)
- * and take effect for the next session without restarting the plugin.
+ * Run the selected skill's own session-start injector and insert its stdout.
+ * Connection settings, credentials, and cache behavior belong to the skill.
  */
-import { createRequire } from 'node:module'
+import { execFile } from 'node:child_process'
 import { existsSync, readdirSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { join } from 'node:path'
-import { pathToFileURL } from 'node:url'
+import { dirname, join } from 'node:path'
+import { promisify } from 'node:util'
+import Schema from '@deepseek-ai/schemastery'
 
-// The bundle is linked from outside the profile, so resolve schemastery (the
-// Config schema library every DSH profile ships) from the profile directory.
-const profileDir = process.env.DSH_PROFILE_DIR ?? join(process.env.DSH_HOME ?? join(homedir(), '.dsh'), 'profiles', process.env.DSH_PROFILE ?? 'default')
-const schemaEntry = createRequire(join(profileDir, 'package.json')).resolve('@deepseek-ai/schemastery')
-const Schema = (await import(pathToFileURL(schemaEntry).href)).default
+const execFileAsync = promisify(execFile)
 
 export const inject = ['skills', 'agents']
 export const name = 'skill-preload'
@@ -36,48 +30,48 @@ function scanSkills() {
 }
 
 export const Config = Schema.object({
-  skills: Schema.array(Schema.string()).default(['preload']).volatile().description('Skill names to preload, in order.'),
-  on: Schema.array(Schema.union(['startup', 'resume', 'clear', 'compact'])).default(['startup', 'clear']).volatile().description('Session start sources that trigger preloading.'),
-  subagents: Schema.boolean().default(false).volatile().description('Also preload for subagent sessions.'),
+  skill: Schema.string().default('preload').volatile().description('Skill whose scripts/inject.py supplies the opening context.'),
   available: Schema.array(Schema.string()).default(scanSkills()).volatile().description('Skills found on disk when the plugin loaded (read-only hint for the picker).'),
 })
 
 export function apply(ctx, config) {
-  ctx.on('agent/created', async ({ agent, source, signal }) => {
-    const skills = (config.skills.get() ?? []).filter(s => typeof s === 'string' && s.trim()).map(s => s.trim())
-    if (skills.length === 0) return
-    if (!(config.on.get() ?? []).includes(source)) return
-    if (config.subagents.get() !== true && agent.session.header.origin === 'subagent') return
+  ctx.on('agent/created', async ({ agent, signal }) => {
+    const skillName = String(config.skill.get() ?? 'preload').trim()
+    if (!skillName || agent.session.header.origin === 'subagent') return
 
-    const cwd = agent.session.header.cwd
-    const blocks = []
-    for (const skillName of skills) {
-      try {
-        const skill = await ctx.skills.get(skillName, { cwd, signal })
-        if (skill === undefined) {
-          ctx.logger.warn('skill-preload: skill %s not found', skillName)
-          continue
-        }
-        const body = String(skill.content).replaceAll('</system-reminder>', '<\\/system-reminder>')
-        blocks.push(`<skill_content name="${skill.name}">\n${body}\n</skill_content>`)
-      } catch (error) {
-        ctx.logger.warn('skill-preload: failed to load %s: %o', skillName, error)
+    try {
+      const cwd = agent.session.header.cwd
+      const skill = await ctx.skills.get(skillName, { cwd, signal })
+      if (!skill?.path) {
+        ctx.logger.warn('skill-preload: skill %s has no local instruction path', skillName)
+        return
       }
+
+      const script = join(dirname(skill.path), 'scripts', 'inject.py')
+      if (!existsSync(script)) {
+        ctx.logger.warn('skill-preload: %s does not provide scripts/inject.py', skillName)
+        return
+      }
+
+      const { stdout } = await execFileAsync('python3', [script], {
+        encoding: 'utf8',
+        timeout: 10000,
+        maxBuffer: 4 * 1024 * 1024,
+        windowsHide: true,
+        signal,
+      })
+      if (!stdout.trim()) {
+        ctx.logger.warn('skill-preload: %s injector returned empty output', skillName)
+        return
+      }
+
+      agent.inject({
+        role: 'user',
+        content: [{ type: 'text', text: stdout }],
+        source: { kind: 'skill-preload' },
+      })
+    } catch (error) {
+      ctx.logger.warn('skill-preload: failed to run %s injector: %o', skillName, error)
     }
-    if (blocks.length === 0) return
-
-    const text = [
-      '<system-reminder>',
-      'Preloaded skills (full text below). Follow them. If they tell you to load other skills, do that first.',
-      '',
-      blocks.join('\n\n'),
-      '</system-reminder>',
-    ].join('\n')
-
-    agent.inject({
-      role: 'user',
-      content: [{ type: 'text', text }],
-      source: { kind: 'skill-preload' },
-    })
   })
 }
