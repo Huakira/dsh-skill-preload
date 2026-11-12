@@ -1,1 +1,1 @@
-{ "meta": { "title": "Skill preload", "description": "Injects the configured skills into every new session so they are loaded from the first step." } }
+{ "meta": { "title": "Skill preload", "description": "Runs the selected skill's injector and directly injects the opening bundle; defaults to preload." } }

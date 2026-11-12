@@ -2,9 +2,4 @@
     - id: skill-preload
       name: '@local/dsh-skill-preload'
       config:
-        skills:
-          - preload
-        on:
-          - startup
-          - clear
-        subagents: false
+        skill: preload
