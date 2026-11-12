@@ -34,6 +34,12 @@ export const Config = Schema.object({
   available: Schema.array(Schema.string()).default(scanSkills()).volatile().description('Skills found on disk when the plugin loaded (read-only hint for the picker).'),
 })
 
+const FAIL = (why) => `STARTUP-BUNDLE UNAVAILABLE: preload injection failed (${why}). Call the MCPHub startup-bundle tool manually before the user's task.`
+
+function notify(agent, text) {
+  agent.inject({ role: 'user', content: [{ type: 'text', text }], source: { kind: 'skill-preload' } })
+}
+
 export function apply(ctx, config) {
   ctx.on('agent/created', async ({ agent, signal }) => {
     const skillName = String(config.skill.get() ?? 'preload').trim()
@@ -41,15 +47,17 @@ export function apply(ctx, config) {
 
     try {
       const cwd = agent.session.header.cwd
-      const skill = await ctx.skills.get(skillName, { cwd, signal })
+      const skill = await ctx.skills.get(skillName, { cwd, signal, scope: agent })
       if (!skill?.path) {
         ctx.logger.warn('skill-preload: skill %s has no local instruction path', skillName)
+        notify(agent, FAIL(`skill ${skillName} not found`))
         return
       }
 
       const script = join(dirname(skill.path), 'scripts', 'inject.py')
       if (!existsSync(script)) {
         ctx.logger.warn('skill-preload: %s does not provide scripts/inject.py', skillName)
+        notify(agent, FAIL('no scripts/inject.py'))
         return
       }
 
@@ -62,6 +70,7 @@ export function apply(ctx, config) {
       })
       if (!stdout.trim()) {
         ctx.logger.warn('skill-preload: %s injector returned empty output', skillName)
+        notify(agent, FAIL('empty injector output'))
         return
       }
 
@@ -72,6 +81,7 @@ export function apply(ctx, config) {
       })
     } catch (error) {
       ctx.logger.warn('skill-preload: failed to run %s injector: %o', skillName, error)
+      try { notify(agent, FAIL('injector error')) } catch { /* agent gone */ }
     }
   })
 }
