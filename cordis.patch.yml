@@ -1,5 +1,5 @@
 - insert:
     - id: skill-preload
-      name: @huakira/skill-preload
+      name: @huakirax/skill-preload
       config:
         skill: preload
