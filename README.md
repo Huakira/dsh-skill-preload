@@ -1,5 +1,7 @@
 # dsh-skill-preload
 
+> 个人自用插件，代码和文档由 AI 参与编写，不承诺维护。使用前请先备份 DSH 配置。
+
 DeepSeek Harness (DSH) 插件：在会话开始、恢复、清空或压缩后，运行所选技能自带的 `scripts/inject.py`，把标准输出直接注入上下文。默认选择 `preload`，模型不需要再调用 `startup-bundle` 工具。
 
 A DSH plugin that runs the selected skill's `scripts/inject.py` on session lifecycle events and directly injects its stdout. It defaults to `preload`.
