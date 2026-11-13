@@ -16,8 +16,8 @@ A DSH plugin that runs the selected skill's `scripts/inject.py` on session lifec
 ## 安装 / Install
 
 ```bash
-dsh plugin add /path/to/dsh-skill-preload      # 本地目录
-# 或在 Plugins 页 → Add plugin → 填本目录或 Git 地址
+dsh plugin --profile web add @huakira/skill-preload
+# 本地开发：dsh plugin add /path/to/dsh-skill-preload
 ```
 
 需要系统可用的 `python3`；注入脚本只使用 Python 标准库。
@@ -42,7 +42,7 @@ dsh plugin add /path/to/dsh-skill-preload      # 本地目录
 ```yaml
 - insert:
     - id: skill-preload
-      name: '@local/dsh-skill-preload'
+      name: '@huakira/skill-preload'
       config:
         skill: preload
 ```
