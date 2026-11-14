@@ -1,9 +1,9 @@
 window.__ModuleLoader__.load({
-  id: '@local/dsh-skill-preload',
+  id: '@huakirax/dsh-skill-preload',
   factory(require) {
     const React = require('react');
     const h = React.createElement;
-    const KEY = '@local/dsh-skill-preload#skill-preload';
+    const KEY = '@huakirax/dsh-skill-preload#skill-preload';
 
     const zh = (navigator.language || '').toLowerCase().startsWith('zh');
     const T = zh ? {
