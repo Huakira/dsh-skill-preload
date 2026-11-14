@@ -16,7 +16,7 @@ A DSH plugin that runs the selected skill's `scripts/inject.py` on session lifec
 ## 安装 / Install
 
 ```bash
-dsh plugin --profile web add @huakirax/skill-preload
+dsh plugin --profile web add @huakirax/dsh-skill-preload
 # 本地开发：dsh plugin add /path/to/dsh-skill-preload
 ```
 
@@ -42,7 +42,7 @@ dsh plugin --profile web add @huakirax/skill-preload
 ```yaml
 - insert:
     - id: skill-preload
-      name: '@huakirax/skill-preload'
+      name: '@huakirax/dsh-skill-preload'
       config:
         skill: preload
 ```

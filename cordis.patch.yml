@@ -1,5 +1,5 @@
 - insert:
     - id: skill-preload
-      name: @huakirax/skill-preload
+      name: @huakirax/dsh-skill-preload
       config:
         skill: preload
