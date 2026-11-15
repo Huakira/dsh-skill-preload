@@ -3,6 +3,7 @@
  * Connection settings, credentials, and cache behavior belong to the skill.
  */
 import { execFile } from 'node:child_process'
+import { randomUUID } from 'node:crypto'
 import { existsSync, readdirSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -37,7 +38,11 @@ export const Config = Schema.object({
 const FAIL = (why) => `STARTUP-BUNDLE UNAVAILABLE: preload injection failed (${why}). Call the MCPHub startup-bundle tool manually before the user's task.`
 
 function notify(agent, text) {
-  agent.inject({ role: 'user', content: [{ type: 'text', text }], source: { kind: 'skill-preload' } })
+  // Durable inbox splices need a stable id: mobile-gateway's inbox
+  // validation rejects pending messages without one (2026-11-15 finding —
+  // three sessions were stuck with id-less STARTUP-BUNDLE entries that made
+  // every session/control stream reconnect fail once per second).
+  agent.inject({ id: randomUUID(), role: 'user', content: [{ type: 'text', text }], source: { kind: 'skill-preload' } })
 }
 
 export function apply(ctx, config) {
@@ -75,6 +80,7 @@ export function apply(ctx, config) {
       }
 
       agent.inject({
+        id: randomUUID(),
         role: 'user',
         content: [{ type: 'text', text: stdout }],
         source: { kind: 'skill-preload' },
